@@ -1,0 +1,224 @@
+/**
+    Estrutura inicial para um jogo
+    versão: 0.1 (Prof. Alex,  Adaptado Prof. Felski)
+    + Sistema de bomba (Marcelo)
+*/
+#include <iostream>
+#include <windows.h>
+#include <conio.h>
+
+using namespace std;
+
+
+int main()
+{
+    ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
+        //INICIO: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
+        HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+        CONSOLE_CURSOR_INFO     cursorInfo;
+        GetConsoleCursorInfo(out, &cursorInfo);
+        cursorInfo.bVisible = false; // set the cursor visibility
+        SetConsoleCursorInfo(out, &cursorInfo);
+        //FIM: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
+        //INICIO: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
+        short int CX=0, CY=0;
+        COORD coord;
+        coord.X = CX;
+        coord.Y = CY;
+        //FIM: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
+    ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, ACIMA.
+
+    const int LINHAS = 13;
+    const int COLUNAS = 39;
+
+    // 0 = chao livre | 1 = parede indestrutivel | 2 = bloco destrutivel
+    int m[LINHAS][COLUNAS] = {
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,1,
+    1,0,1,0,1,0,1,0,1,0,1,2,1,2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,2,0,0,0,0,0,0,2,0,2,0,0,0,0,0,0,0,2,0,1,
+    1,2,1,0,1,0,1,0,1,0,1,2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+    1,0,0,0,0,0,0,0,2,0,0,2,0,0,2,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,1,
+    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+    1,0,2,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,2,1,0,1,0,1,0,1,2,1,0,1,0,1,0,1,0,1,0,1,0,1,2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,2,0,0,0,0,0,0,2,2,2,2,2,0,0,2,0,0,0,0,1,
+    1,0,1,0,1,0,1,0,1,0,1,0,1,2,1,0,1,0,1,0,1,2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,2,0,2,2,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    };
+
+    //Posicao inicial do personagem no console
+    int x=1, y=1;
+    //Variavel para tecla precionada
+    char tecla;
+
+    // ---------- VARIAVEIS DA BOMBA ----------
+    bool bombaAtiva = false;      // existe uma bomba plantada esperando explodir?
+    int bombaX = -1, bombaY = -1; // posicao da bomba
+    int bombaTimer = 0;           // contador de frames desde que a bomba foi plantada
+    const int TEMPO_PARA_EXPLODIR = 20; // 20 frames * 50ms = ~1 segundo
+
+    bool explosaoAtiva = false;   // a explosao esta acontecendo/visivel agora?
+    int explosaoTimer = 0;
+    const int TEMPO_VISUAL_EXPLOSAO = 6; // quantos frames o "fogo" fica visivel
+    const int ALCANCE = 2;        // quantas casas a explosao alcanca em cada direcao
+
+    bool explodindo[LINHAS][COLUNAS] = {false}; // marca quais celulas estao em chamas agora
+    // -----------------------------------------
+
+    bool gameOver = false; // fica true quando o personagem morre na explosao
+
+    while(true){
+        ///Posiciona a escrita no iicio do console
+        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+
+        ///Imprime o jogo: mapa e personagem.
+        for(int i=0;i<LINHAS;i++){
+            for(int j=0;j<COLUNAS;j++){
+                if(i==x && j==y){
+                    cout<<char(64); //personagem ( @ )
+                } else if (explosaoAtiva && explodindo[i][j]){
+                    cout<<char(42); //fogo da explosao ( * )
+                } else if (bombaAtiva && i==bombaX && j==bombaY){
+                    cout<<char(79); //bomba plantada ( O )
+                } else {
+                    switch (m[i][j]){
+                        case 0: cout<<" "; break;       //caminho
+                        case 1: cout<<char(219); break; //parede
+                        case 2: cout<<char(178); break; //bloco destrutivel
+                    } //fim switch
+                }
+            }
+            cout<<"\n";
+        } //fim for mapa
+
+        ///executa os movimentos e a colocacao de bomba
+         if ( _kbhit() ){
+            tecla = getch();
+            int novoX = x, novoY = y; // posicao para onde o personagem tentaria ir
+
+            switch(tecla)
+            {
+                case 72: case 'w': ///cima
+                    novoX = x - 1;
+                break;
+                case 80: case 's': ///baixo
+                    novoX = x + 1;
+                break;
+                case 75:case 'a': ///esquerda
+                    novoY = y - 1;
+                break;
+                case 77: case 'd': ///direita
+                    novoY = y + 1;
+                break;
+                case 32: ///ESPACO - colocar bomba
+                    if(!bombaAtiva){ // so deixa colocar uma bomba de cada vez
+                        bombaAtiva = true;
+                        bombaX = x;
+                        bombaY = y;
+                        bombaTimer = 0;
+                    }
+                break;
+            }
+
+            // so move o personagem se a posicao de destino for chao livre (0).
+            // paredes indestrutiveis (1) e blocos destrutiveis (2) bloqueiam a passagem
+            // ate serem destruidos por uma bomba (quando viram 0).
+            if(novoX>=0 && novoX<LINHAS && novoY>=0 && novoY<COLUNAS){
+                if(m[novoX][novoY] == 0){
+                    x = novoX;
+                    y = novoY;
+                }
+            }
+         }
+
+        ///atualiza o temporizador da bomba
+        if(bombaAtiva){
+            bombaTimer++;
+            if(bombaTimer >= TEMPO_PARA_EXPLODIR){
+                // ---------- EXPLODE A BOMBA ----------
+                bombaAtiva = false;
+
+                // limpa marcacoes de explosao antigas
+                for(int i=0;i<LINHAS;i++)
+                    for(int j=0;j<COLUNAS;j++)
+                        explodindo[i][j] = false;
+
+                // marca o centro da explosao
+                explodindo[bombaX][bombaY] = true;
+
+                // direcoes: cima, baixo, esquerda, direita
+                int dirX[4] = {-1, 1, 0, 0};
+                int dirY[4] = { 0, 0,-1, 1};
+
+                for(int d=0; d<4; d++){
+                    for(int passo=1; passo<=ALCANCE; passo++){
+                        int ni = bombaX + dirX[d]*passo;
+                        int nj = bombaY + dirY[d]*passo;
+
+                        // fora do mapa? para.
+                        if(ni<0 || ni>=LINHAS || nj<0 || nj>=COLUNAS) break;
+
+                        if(m[ni][nj] == 1){
+                            break; // parede indestrutivel bloqueia a explosao
+                        }
+                        else if(m[ni][nj] == 2){
+                            explodindo[ni][nj] = true;
+                            m[ni][nj] = 0; // destroi o bloco
+                            break; // a explosao para depois de destruir um bloco
+                        }
+                        else{
+                            explodindo[ni][nj] = true; // chao livre, explosao passa e continua
+                        }
+                    }
+                }
+
+                explosaoAtiva = true;
+                explosaoTimer = 0;
+                // ---------------------------------------
+            }
+        }
+
+        ///atualiza o temporizador da explosao (efeito visual)
+        if(explosaoAtiva){
+            // se o personagem estiver em cima de uma celula em chamas, ele morre
+            if(explodindo[x][y]){
+                gameOver = true;
+            }
+
+            explosaoTimer++;
+            if(explosaoTimer >= TEMPO_VISUAL_EXPLOSAO){
+                explosaoAtiva = false;
+            }
+        }
+
+        if(gameOver){
+            break; // sai do laco principal do jogo
+        }
+
+        Sleep(50); // evita o tremor/piscar da tela
+
+    } //fim do laco do jogo
+
+    if(gameOver){
+        // Limpeza manual (reforco, caso o system("cls") nao funcione nesse ambiente)
+        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+        for(int i=0; i<LINHAS+5; i++){
+            for(int j=0; j<COLUNAS+5; j++){
+                cout<<" ";
+            }
+            cout<<"\n";
+        }
+
+        system("cls"); // limpa a tela do console de vez
+
+        cout << "\n\n";
+        cout << "        GAME OVER - voce foi pego pela explosao!\n";
+        cout << "\n\n";
+
+        system("pause"); // segura a janela ate o usuario apertar uma tecla
+    }
+
+    return 0;
+} //fim main
